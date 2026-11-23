@@ -32,9 +32,12 @@ import com.example.model.MotionAnimationType
 import com.example.model.MotionFontStyle
 import com.example.model.MotionProject
 import com.example.model.MotionScene
+import com.example.model.MotionTopicGenre
 import com.example.model.SceneSoundEffect
 import com.example.model.SceneSymbol
 import com.example.model.SceneTransitionType
+import com.example.model.SceneVfxMatcher
+import com.example.model.SceneVisualEffect
 import com.example.model.SmartColorPalette
 import com.example.model.TimelineEngine
 import com.example.model.TimelineFrameState
@@ -48,6 +51,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.pow
@@ -402,6 +406,7 @@ object MotionVideoExporter {
                     frameState = frameState,
                     totalScenes = segments.size,
                     palette = palette,
+                    topicGenre = project.topicGenreEnum,
                     headlineFont = activeHeadlineFont,
                     bodyFont = activeBodyFont
                 )
@@ -734,6 +739,7 @@ object MotionVideoExporter {
         frameState: TimelineFrameState,
         totalScenes: Int,
         palette: SmartColorPalette,
+        topicGenre: MotionTopicGenre,
         headlineFont: Typeface,
         bodyFont: Typeface
     ) {
@@ -750,6 +756,7 @@ object MotionVideoExporter {
                 sceneIndex = frameState.primaryIndex,
                 sceneProgress = frameState.primaryProgress,
                 palette = palette,
+                topicGenre = topicGenre,
                 headlineFont = headlineFont,
                 bodyFont = bodyFont
             )
@@ -763,6 +770,7 @@ object MotionVideoExporter {
                 sceneIndex = frameState.primaryIndex,
                 sceneProgress = frameState.primaryProgress,
                 palette = palette,
+                topicGenre = topicGenre,
                 headlineFont = headlineFont,
                 bodyFont = bodyFont
             )
@@ -774,6 +782,7 @@ object MotionVideoExporter {
                 sceneIndex = frameState.incomingIndex ?: (frameState.primaryIndex + 1),
                 sceneProgress = frameState.incomingProgress,
                 palette = palette,
+                topicGenre = topicGenre,
                 headlineFont = headlineFont,
                 bodyFont = bodyFont
             )
@@ -953,9 +962,17 @@ object MotionVideoExporter {
         sceneIndex: Int,
         sceneProgress: Float,
         palette: SmartColorPalette,
+        topicGenre: MotionTopicGenre,
         headlineFont: Typeface,
         bodyFont: Typeface
     ) {
+        val effectiveVfx = SceneVfxMatcher.resolveEffectiveEffect(scene, topicGenre)
+        val hasNeonGlow = effectiveVfx == SceneVisualEffect.NEON_GLOW ||
+            effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES
+        val hasParticles = effectiveVfx == SceneVisualEffect.FLOATING_PARTICLES ||
+            effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES
+        val hasCinematicBlur = effectiveVfx == SceneVisualEffect.CINEMATIC_BLUR
+
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
                 0f,
@@ -969,22 +986,60 @@ object MotionVideoExporter {
         }
         canvas.drawRect(0f, 0f, width, height, bgPaint)
 
-        // Ambient glow
+        val minDim = min(width, height)
+        val pulse = 0.5f + 0.5f * sin(sceneProgress * PI.toFloat() * 4f)
+
+        // Ambient glow (boosted for Neon Glow & Cyber Gaming scenes)
         val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             val cx = width * (0.3f + 0.4f * sin(sceneProgress * PI.toFloat()))
             val cy = height * 0.35f
+            val alphaCenter = if (hasNeonGlow) (115 + (40 * pulse).toInt()) else 70
+            val radius = if (hasNeonGlow) minDim * 0.85f else minDim * 0.65f
             shader = RadialGradient(
                 cx,
                 cy,
-                min(width, height) * 0.65f,
-                withAlpha(palette.primaryInt, 70),
+                radius,
+                withAlpha(palette.primaryInt, alphaCenter),
                 Color.TRANSPARENT,
                 Shader.TileMode.CLAMP
             )
         }
-        canvas.drawCircle(width * 0.5f, height * 0.4f, min(width, height) * 0.7f, glowPaint)
+        canvas.drawCircle(width * 0.5f, height * 0.4f, minDim * 0.82f, glowPaint)
+
+        if (hasNeonGlow) {
+            val secCx = width * (0.72f - 0.36f * sin(sceneProgress * PI.toFloat()))
+            val secCy = height * 0.68f
+            val secGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    secCx,
+                    secCy,
+                    minDim * 0.65f,
+                    withAlpha(palette.secondaryInt, (82 + (28 * (1f - pulse)).toInt())),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawCircle(secCx, secCy, minDim * 0.65f, secGlowPaint)
+        }
 
         drawMotif(canvas, width, height, scene.motifEnum, sceneProgress, palette)
+
+        if (hasCinematicBlur) {
+            drawCinematicBlurVfx(canvas, width, height, minDim, sceneIndex, sceneProgress, palette)
+        }
+        if (hasParticles || hasNeonGlow) {
+            drawParticlesAndGlowVfx(
+                canvas = canvas,
+                width = width,
+                height = height,
+                minDim = minDim,
+                sceneIndex = sceneIndex,
+                sceneProgress = sceneProgress,
+                palette = palette,
+                effectiveVfx = effectiveVfx,
+                pulse = pulse
+            )
+        }
 
         if (scene.animationEnum == MotionAnimationType.CINEMA_BARS) {
             val barSlide = (sceneProgress / 0.3f).coerceIn(0f, 1f)
@@ -1066,7 +1121,6 @@ object MotionVideoExporter {
 
         val contentWidth = (width * 0.82f).toInt()
         val horizontalMargin = (width - contentWidth) / 2f
-        val minDim = min(width, height)
 
         val hasSymbol = scene.symbolEnum != SceneSymbol.NONE
         val pillTop = if (hasSymbol) {
@@ -1079,7 +1133,8 @@ object MotionVideoExporter {
                 size = emblemSize,
                 symbol = scene.symbolEnum,
                 palette = palette,
-                alphaFactor = alphaFactor
+                alphaFactor = alphaFactor,
+                hasNeonGlow = hasNeonGlow
             )
             emblemTop + emblemSize + minDim * 0.025f
         } else {
@@ -1133,6 +1188,11 @@ object MotionVideoExporter {
             textSize = minDim * 0.074f
             color = palette.textInt
             alpha = (alphaFactor * 255).toInt()
+            if (hasNeonGlow) {
+                setShadowLayer(minDim * 0.032f, 0f, 0f, withAlpha(palette.primaryInt, (alphaFactor * 220).toInt()))
+            } else if (hasCinematicBlur) {
+                setShadowLayer(minDim * 0.018f, 0f, minDim * 0.006f, Color.argb((alphaFactor * 165).toInt(), 0, 0, 0))
+            }
         }
         val headlineLayout = StaticLayout.Builder
             .obtain(headlineText, 0, headlineText.length, headlinePaint, contentWidth)
@@ -1405,6 +1465,149 @@ object MotionVideoExporter {
         }
     }
 
+    private fun drawCinematicBlurVfx(
+        canvas: Canvas,
+        width: Float,
+        height: Float,
+        minDim: Float,
+        sceneIndex: Int,
+        sceneProgress: Float,
+        palette: SmartColorPalette
+    ) {
+        val orbPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        for (i in 0..6) {
+            val seed = i * 1.91f + sceneIndex * 0.7f
+            val bx = width * (0.14f + 0.72f * (0.5f + 0.5f * sin(seed + sceneProgress * 1.4f)))
+            val by = height * (0.12f + 0.76f * (0.5f + 0.5f * cos(seed * 1.3f - sceneProgress * 1.1f)))
+            val bRadius = minDim * (0.14f + (i % 3) * 0.06f)
+            val orbColor = if (i % 2 == 0) palette.primaryInt else palette.secondaryInt
+            orbPaint.shader = RadialGradient(
+                bx,
+                by,
+                bRadius,
+                intArrayOf(withAlpha(orbColor, 68), withAlpha(orbColor, 20), Color.TRANSPARENT),
+                floatArrayOf(0f, 0.55f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            canvas.drawCircle(bx, by, bRadius, orbPaint)
+        }
+        val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                width * 0.5f,
+                height * 0.5f,
+                minDim * 0.92f,
+                Color.TRANSPARENT,
+                Color.argb(110, 0, 0, 0),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, width, height, vignettePaint)
+    }
+
+    private fun drawParticlesAndGlowVfx(
+        canvas: Canvas,
+        width: Float,
+        height: Float,
+        minDim: Float,
+        sceneIndex: Int,
+        sceneProgress: Float,
+        palette: SmartColorPalette,
+        effectiveVfx: SceneVisualEffect,
+        pulse: Float
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        if (effectiveVfx == SceneVisualEffect.NEON_GLOW || effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES) {
+            val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f,
+                    0f,
+                    0f,
+                    height,
+                    intArrayOf(
+                        withAlpha(palette.primaryInt, (38 + 20 * pulse).toInt()),
+                        Color.TRANSPARENT,
+                        withAlpha(palette.secondaryInt, (38 + 20 * (1f - pulse)).toInt())
+                    ),
+                    floatArrayOf(0f, 0.5f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawRect(0f, 0f, width, height, edgePaint)
+        }
+
+        if (effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES) {
+            val scanPaint = Paint().apply {
+                color = withAlpha(palette.primaryInt, 11)
+                strokeWidth = 1.5f
+            }
+            val scanStep = minDim * 0.014f
+            var sy = 0f
+            while (sy < height) {
+                canvas.drawLine(0f, sy, width, sy, scanPaint)
+                sy += scanStep
+            }
+            for (i in 0 until 20) {
+                val seed = i * 2.13f + sceneIndex * 1.1f
+                val px = ((0.5f + 0.5f * sin(seed * 3.7f)) * width + sceneProgress * width * 0.25f * cos(seed))
+                    .let { ((it % width) + width) % width }
+                val py = ((0.5f + 0.5f * cos(seed * 2.9f)) * height - sceneProgress * height * 0.35f)
+                    .let { ((it % height) + height) % height }
+                val sparkColor = if (i % 2 == 0) palette.primaryInt else palette.secondaryInt
+                val sparkLen = minDim * (0.025f + (i % 3) * 0.014f)
+                val twinkle = 0.45f + 0.55f * abs(sin(sceneProgress * PI.toFloat() * 5f + seed))
+
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = minDim * 0.0045f
+                paint.shader = null
+                paint.color = withAlpha(sparkColor, (165 * twinkle).toInt())
+                canvas.drawLine(px, py, px - sparkLen * 0.45f, py + sparkLen, paint)
+
+                val haloR = minDim * 0.016f
+                paint.style = Paint.Style.FILL
+                paint.shader = RadialGradient(
+                    px,
+                    py,
+                    haloR,
+                    intArrayOf(
+                        Color.argb((225 * twinkle).toInt(), 255, 255, 255),
+                        withAlpha(sparkColor, (130 * twinkle).toInt()),
+                        Color.TRANSPARENT
+                    ),
+                    floatArrayOf(0f, 0.4f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawCircle(px, py, haloR, paint)
+            }
+        } else if (effectiveVfx == SceneVisualEffect.FLOATING_PARTICLES) {
+            for (i in 0 until 26) {
+                val seed = i * 1.67f + sceneIndex * 0.85f
+                val speedFactor = if (i % 3 == 0) 0.22f else 0.12f
+                val px = ((0.5f + 0.5f * sin(seed * 4.1f)) * width + sin(sceneProgress * PI.toFloat() * 2f + seed) * width * 0.05f)
+                    .let { ((it % width) + width) % width }
+                val py = ((0.5f + 0.5f * cos(seed * 2.7f)) * height - sceneProgress * height * speedFactor)
+                    .let { ((it % height) + height) % height }
+                val pColor = if (i % 2 == 0) palette.primaryInt else palette.secondaryInt
+                val twinkle = 0.35f + 0.65f * abs(sin(sceneProgress * PI.toFloat() * 3f + seed))
+                val coreR = minDim * (0.0032f + (i % 4) * 0.002f)
+
+                paint.style = Paint.Style.FILL
+                paint.shader = RadialGradient(
+                    px,
+                    py,
+                    coreR * 3.4f,
+                    withAlpha(pColor, (145 * twinkle).toInt()),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawCircle(px, py, coreR * 3.4f, paint)
+
+                paint.shader = null
+                paint.color = Color.argb((215 * twinkle).toInt(), 255, 255, 255)
+                canvas.drawCircle(px, py, coreR * 0.65f, paint)
+            }
+        }
+    }
+
     private fun drawSymbolEmblem(
         canvas: Canvas,
         cx: Float,
@@ -1412,17 +1615,31 @@ object MotionVideoExporter {
         size: Float,
         symbol: SceneSymbol,
         palette: SmartColorPalette,
-        alphaFactor: Float
+        alphaFactor: Float,
+        hasNeonGlow: Boolean = false
     ) {
         val alphaInt = (alphaFactor * 255).toInt().coerceIn(0, 255)
+        if (hasNeonGlow) {
+            val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    cx,
+                    cy,
+                    size * 1.15f,
+                    withAlpha(palette.primaryInt, (alphaFactor * 135).toInt()),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawCircle(cx, cy, size * 1.15f, haloPaint)
+        }
         val half = size / 2f
         val rect = RectF(cx - half, cy - half, cx + half, cy + half)
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = withAlpha(palette.primaryInt, (alphaFactor * 55).toInt())
+            color = withAlpha(palette.primaryInt, (alphaFactor * if (hasNeonGlow) 82 else 55).toInt())
         }
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = size * 0.045f
+            strokeWidth = size * (if (hasNeonGlow) 0.065f else 0.045f)
             color = withAlpha(palette.primaryInt, alphaInt)
         }
         canvas.drawRoundRect(rect, size * 0.28f, size * 0.28f, bgPaint)

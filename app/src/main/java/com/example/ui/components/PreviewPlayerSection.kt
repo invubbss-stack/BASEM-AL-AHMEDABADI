@@ -89,6 +89,7 @@ import com.example.model.AspectRatioOption
 import com.example.model.ContentSfxMatcher
 import com.example.model.SaudiVoiceGender
 import com.example.model.SceneTransitionType
+import com.example.model.SceneVfxMatcher
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.viewmodel.MotionStudioUiState
 import java.io.File
@@ -159,10 +160,16 @@ fun PreviewPlayerSection(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                val activeVfx = SceneVfxMatcher.resolveEffectiveEffect(
+                    scene = activeFrame.primaryScene,
+                    projectGenre = project.topicGenreEnum
+                )
                 Text(
-                    text = "${project.scenes.size} مشاهد • ${project.aspectRatioEnum.labelAr} • ${project.fontStyleEnum.labelAr}",
+                    text = "${project.scenes.size} مشاهد • ${project.aspectRatioEnum.labelAr} • ${activeVfx.shortLabelAr}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Surface(
@@ -201,6 +208,7 @@ fun PreviewPlayerSection(
                 aspectRatio = project.aspectRatioEnum,
                 palette = project.palette,
                 fontStyle = project.fontStyleEnum,
+                topicGenre = project.topicGenreEnum,
                 isPlaying = uiState.isPlaying,
                 isSpeakingThisScene = isSpeakingActiveScene,
                 spokenFraction = uiState.audioSync.spokenFraction,
@@ -256,8 +264,12 @@ fun PreviewPlayerSection(
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(18.dp)
                         )
+                        val sceneVfxLabel = SceneVfxMatcher.resolveEffectiveEffect(
+                            scene = activeFrame.primaryScene,
+                            projectGenre = project.topicGenreEnum
+                        ).shortLabelAr
                         Text(
-                            text = "${project.topicGenreEnum.labelAr} • ${project.palette.nameAr}",
+                            text = "${project.topicGenreEnum.labelAr} • ${project.palette.nameAr} • $sceneVfxLabel",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )

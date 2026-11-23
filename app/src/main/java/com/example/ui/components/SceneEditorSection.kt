@@ -59,9 +59,12 @@ import com.example.model.AudioMoodCategory
 import com.example.model.ContentSfxMatcher
 import com.example.model.MotionAnimationType
 import com.example.model.MotionScene
+import com.example.model.MotionTopicGenre
 import com.example.model.SceneSoundEffect
 import com.example.model.SceneSymbol
 import com.example.model.SceneTransitionType
+import com.example.model.SceneVfxMatcher
+import com.example.model.SceneVisualEffect
 import com.example.model.VisualMotif
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import java.util.Locale
@@ -72,6 +75,7 @@ fun SceneEditorSection(
     scenes: List<MotionScene>,
     selectedIndex: Int,
     totalDurationSeconds: Float,
+    topicGenre: MotionTopicGenre,
     selectedSfxCategoryFilter: AudioMoodCategory?,
     onSelectSfxCategory: (AudioMoodCategory?) -> Unit,
     onSelectScene: (Int) -> Unit,
@@ -87,7 +91,8 @@ fun SceneEditorSection(
         soundEffect: SceneSoundEffect?,
         voiceoverScript: String?,
         voiceoverEnabled: Boolean?,
-        transitionToNext: SceneTransitionType?
+        transitionToNext: SceneTransitionType?,
+        visualEffect: SceneVisualEffect?
     ) -> Unit,
     onAddScene: () -> Unit,
     onDeleteScene: (Int) -> Unit,
@@ -154,10 +159,11 @@ fun SceneEditorSection(
                 index = index,
                 totalCount = scenes.size,
                 isExpanded = isExpanded,
+                topicGenre = topicGenre,
                 selectedSfxCategoryFilter = selectedSfxCategoryFilter,
                 onSelectSfxCategory = onSelectSfxCategory,
                 onToggleExpand = { onSelectScene(index) },
-                onUpdate = { badge, headline, subheadline, duration, anim, motif, symbol, sfx, voiceScript, voiceEnabled, transition ->
+                onUpdate = { badge, headline, subheadline, duration, anim, motif, symbol, sfx, voiceScript, voiceEnabled, transition, vfx ->
                     onUpdateScene(
                         index,
                         badge,
@@ -170,7 +176,8 @@ fun SceneEditorSection(
                         sfx,
                         voiceScript,
                         voiceEnabled,
-                        transition
+                        transition,
+                        vfx
                     )
                 },
                 onDelete = { onDeleteScene(index) },
@@ -191,6 +198,7 @@ private fun SceneEditorCard(
     index: Int,
     totalCount: Int,
     isExpanded: Boolean,
+    topicGenre: MotionTopicGenre,
     selectedSfxCategoryFilter: AudioMoodCategory?,
     onSelectSfxCategory: (AudioMoodCategory?) -> Unit,
     onToggleExpand: () -> Unit,
@@ -205,7 +213,8 @@ private fun SceneEditorCard(
         soundEffect: SceneSoundEffect?,
         voiceoverScript: String?,
         voiceoverEnabled: Boolean?,
-        transitionToNext: SceneTransitionType?
+        transitionToNext: SceneTransitionType?,
+        visualEffect: SceneVisualEffect?
     ) -> Unit,
     onDelete: () -> Unit,
     onMoveUp: () -> Unit,
@@ -215,6 +224,7 @@ private fun SceneEditorCard(
     onAutoMatchSfx: () -> Unit,
     onPreviewVoiceover: () -> Unit
 ) {
+    val resolvedVfx = SceneVfxMatcher.resolveEffectiveEffect(scene, topicGenre)
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
@@ -276,7 +286,7 @@ private fun SceneEditorCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", scene.durationSeconds)} ث • ${scene.animationEnum.labelAr} • ${scene.soundEffectEnum.labelAr}",
+                        text = "${String.format(Locale.US, "%.1f", scene.durationSeconds)} ث • ${scene.animationEnum.labelAr} • ${resolvedVfx.shortLabelAr}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -312,7 +322,7 @@ private fun SceneEditorCard(
                 ) {
                     OutlinedTextField(
                         value = scene.badge,
-                        onValueChange = { onUpdate(it, null, null, null, null, null, null, null, null, null, null) },
+                        onValueChange = { onUpdate(it, null, null, null, null, null, null, null, null, null, null, null) },
                         label = { Text("الشارة (Badge)") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -327,7 +337,7 @@ private fun SceneEditorCard(
 
                     OutlinedTextField(
                         value = scene.headline,
-                        onValueChange = { onUpdate(null, it, null, null, null, null, null, null, null, null, null) },
+                        onValueChange = { onUpdate(null, it, null, null, null, null, null, null, null, null, null, null) },
                         label = { Text("النص الرئيسي للمشهد") },
                         maxLines = 2,
                         shape = RoundedCornerShape(12.dp),
@@ -342,7 +352,7 @@ private fun SceneEditorCard(
 
                     OutlinedTextField(
                         value = scene.subheadline,
-                        onValueChange = { onUpdate(null, null, it, null, null, null, null, null, null, null, null) },
+                        onValueChange = { onUpdate(null, null, it, null, null, null, null, null, null, null, null, null) },
                         label = { Text("النص الفرعي التوضيحي") },
                         maxLines = 3,
                         shape = RoundedCornerShape(12.dp),
@@ -407,7 +417,7 @@ private fun SceneEditorCard(
                                     Switch(
                                         checked = scene.voiceoverEnabled,
                                         onCheckedChange = {
-                                            onUpdate(null, null, null, null, null, null, null, null, null, it, null)
+                                            onUpdate(null, null, null, null, null, null, null, null, null, it, null, null)
                                         },
                                         modifier = Modifier.testTag("scene_voice_switch_$index")
                                     )
@@ -417,7 +427,7 @@ private fun SceneEditorCard(
                             OutlinedTextField(
                                 value = scene.voiceoverScript,
                                 onValueChange = {
-                                    onUpdate(null, null, null, null, null, null, null, null, it, null, null)
+                                    onUpdate(null, null, null, null, null, null, null, null, it, null, null, null)
                                 },
                                 label = { Text("نص التعليق باللهجة الخليجية") },
                                 placeholder = {
@@ -464,7 +474,7 @@ private fun SceneEditorCard(
                             value = scene.durationSeconds,
                             onValueChange = { raw ->
                                 val snapped = (raw * 2f).roundToInt() / 2f
-                                onUpdate(null, null, null, snapped, null, null, null, null, null, null, null)
+                                onUpdate(null, null, null, snapped, null, null, null, null, null, null, null, null)
                             },
                             valueRange = 1.5f..8.0f,
                             steps = 12,
@@ -505,7 +515,7 @@ private fun SceneEditorCard(
                                 FilterChip(
                                     selected = selected,
                                     onClick = {
-                                        onUpdate(null, null, null, null, anim, null, null, null, null, null, null)
+                                        onUpdate(null, null, null, null, anim, null, null, null, null, null, null, null)
                                     },
                                     label = { Text(anim.labelAr) },
                                     colors = FilterChipDefaults.filterChipColors(
@@ -514,6 +524,57 @@ private fun SceneEditorCard(
                                         selectedLabelColor = MaterialTheme.colorScheme.primary
                                     ),
                                     modifier = Modifier.testTag("anim_chip_${index}_${anim.id}")
+                                )
+                            }
+                        }
+                    }
+
+                    // Visual Effects System (Particles / Blur / Glow — auto-activated by scene type or manual override)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "التأثير البصري (Particles / Blur / Glow)",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = SceneVfxMatcher.explainMatch(scene, topicGenre),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(vertical = 2.dp)
+                        ) {
+                            items(SceneVisualEffect.entries) { vfx ->
+                                val selected = scene.visualEffectEnum == vfx
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        onUpdate(null, null, null, null, null, null, null, null, null, null, null, vfx)
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Filled.AutoAwesome,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    },
+                                    label = { Text(vfx.labelAr) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
+                                        selectedLeadingIconColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    modifier = Modifier.testTag("vfx_chip_${index}_${vfx.id}")
                                 )
                             }
                         }
@@ -536,7 +597,7 @@ private fun SceneEditorCard(
                                     FilterChip(
                                         selected = selected,
                                         onClick = {
-                                            onUpdate(null, null, null, null, null, null, null, null, null, null, transition)
+                                            onUpdate(null, null, null, null, null, null, null, null, null, null, transition, null)
                                         },
                                         leadingIcon = {
                                             Icon(
@@ -575,7 +636,7 @@ private fun SceneEditorCard(
                                 FilterChip(
                                     selected = selected,
                                     onClick = {
-                                        onUpdate(null, null, null, null, null, null, symbol, null, null, null, null)
+                                        onUpdate(null, null, null, null, null, null, symbol, null, null, null, null, null)
                                     },
                                     leadingIcon = {
                                         Icon(
@@ -683,7 +744,7 @@ private fun SceneEditorCard(
                                 FilterChip(
                                     selected = selected,
                                     onClick = {
-                                        onUpdate(null, null, null, null, null, null, null, effect, null, null, null)
+                                        onUpdate(null, null, null, null, null, null, null, effect, null, null, null, null)
                                         onPreviewSoundEffect(effect)
                                     },
                                     leadingIcon = {
@@ -722,7 +783,7 @@ private fun SceneEditorCard(
                                 FilterChip(
                                     selected = selected,
                                     onClick = {
-                                        onUpdate(null, null, null, null, null, motif, null, null, null, null, null)
+                                        onUpdate(null, null, null, null, null, motif, null, null, null, null, null, null)
                                     },
                                     label = { Text(motif.labelAr) },
                                     colors = FilterChipDefaults.filterChipColors(

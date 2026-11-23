@@ -1024,7 +1024,8 @@ class MotionStudioViewModel(
         soundEffect: SceneSoundEffect? = null,
         voiceoverScript: String? = null,
         voiceoverEnabled: Boolean? = null,
-        transitionToNext: SceneTransitionType? = null
+        transitionToNext: SceneTransitionType? = null,
+        visualEffect: com.example.model.SceneVisualEffect? = null
     ) {
         _uiState.update { state ->
             val scenes = state.project.scenes.toMutableList()
@@ -1041,7 +1042,8 @@ class MotionStudioViewModel(
                 soundEffect = soundEffect?.id ?: old.soundEffect,
                 voiceoverScript = voiceoverScript ?: old.voiceoverScript,
                 voiceoverEnabled = voiceoverEnabled ?: old.voiceoverEnabled,
-                transitionToNext = transitionToNext?.id ?: old.transitionToNext
+                transitionToNext = transitionToNext?.id ?: old.transitionToNext,
+                visualEffect = visualEffect?.id ?: old.visualEffect
             )
             val finalScene = if (soundEffect == null && (headline != null || subheadline != null || sceneSymbol != null) && old.soundEffectEnum != SceneSoundEffect.NONE) {
                 val matched = ContentSfxMatcher.matchForScene(

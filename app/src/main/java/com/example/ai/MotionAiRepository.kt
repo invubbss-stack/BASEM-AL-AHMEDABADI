@@ -16,6 +16,7 @@ import com.example.model.SaudiVoiceGender
 import com.example.model.SceneSoundEffect
 import com.example.model.SceneSymbol
 import com.example.model.SceneTransitionType
+import com.example.model.SceneVisualEffect
 import com.example.model.SmartColorPalette
 import com.example.model.VisualMotif
 import com.google.firebase.Firebase
@@ -146,6 +147,10 @@ class FirebaseMotionAiRepository : MotionAiRepository {
             "transitionToNext" to Schema.enumeration(
                 values = SceneTransitionType.entries.filter { it != SceneTransitionType.NONE }.map { it.id },
                 description = "Smooth cinematic transition linking this scene to the next scene"
+            ),
+            "visualEffect" to Schema.enumeration(
+                values = SceneVisualEffect.entries.map { it.id },
+                description = "Visual FX layer activated per scene type (CYBER_GLOW_PARTICLES or NEON_GLOW for gaming/tech, FLOATING_PARTICLES for space/celebration, CINEMATIC_BLUR for documentary/story, AUTO)"
             )
         )
     )
@@ -241,7 +246,7 @@ class FirebaseMotionAiRepository : MotionAiRepository {
             1. اختر لوحة ألوان مخصصة (customPalette) بأكواد Hex دقيقة تعبّر عن نفسية الموضوع تماماً (خلفية داكنة غنية، لون سطحي متدرج، لون أساسي مشرق عالي التباين، ولون ثانوي متناغم).
             2. اختر الخط العربي الأنسب للموضوع (THMANYAH للوثائقي والتحريري، EL_MESSIRI للقصص والفخامة، CHANGA للألعاب والإعلانات العريضة، READEX_PRO/CAIRO/ALEXANDRIA/TAJAWAL).
             3. اختر موسيقى خلفية (backgroundMusicTrack) والمؤثرات الصوتية (soundEffect) وفق التصنيف المناسب للموضوع (تجارية، حماسية، هادئة).
-            4. اختر أيقونات المشاهد (sceneSymbol) وحركاتها (animationType) والانتقالات (transitionToNext) وخلفياتها (visualMotif) بتنوع إبداعي يخدم القصة دون تكرار آلي.
+            4. اختر أيقونات المشاهد (sceneSymbol) وحركاتها (animationType) والانتقالات (transitionToNext) وخلفياتها (visualMotif) والتأثير البصري (visualEffect: توهج في الألعاب والتقنية، جزيئات في الفضاء، ضبابية سينمائية في الوثائقي والقصص) بتنوع إبداعي يخدم القصة.
             5. اكتب تعليقاً صوتياً (voiceoverScript) باللهجة السعودية الطبيعية المتناغمة مع نبرة الموضوع (حماسي للإعلانات والألعاب، رزين وملهم للوثائقي والفضاء، دافئ للقصص)، واضبط المدة بين 3.5 و6.5 ثوانٍ لكل مشهد.
             """.trimIndent()
         )
@@ -251,7 +256,7 @@ class FirebaseMotionAiRepository : MotionAiRepository {
         text(
             """
             أنت المخرج المساعد التفاعلي في «ستوديو الموشن».
-            يتحدث معك المستخدم عبر الدردشة أو الصوت ليطلب تعديلات على الفيديو الحالي (الألوان، الخطوط، نصوص المشاهد، إضافة/حذف مشاهد، تغيير الانتقالات، تغيير الموسيقى الخلفية أو المؤثرات أو صوت المعلق أو المقاس).
+            يتحدث معك المستخدم عبر الدردشة أو الصوت ليطلب تعديلات على الفيديو الحالي (الألوان، الخطوط، نصوص المشاهد، إضافة/حذف مشاهد، تغيير الانتقالات، التأثيرات البصرية مثل التوهج أو الجزيئات أو الضبابية، تغيير الموسيقى الخلفية أو المؤثرات أو صوت المعلق أو المقاس).
             التزم بما يلي:
             1. نفّذ طلب المستخدم بدقة وبذكاء إخراجي في JSON المشروع الكامل مع الحفاظ على المشاهد التي لم يطلب تغييرها.
             2. لا تضف أبداً أي إشارة لظهور المتكلم داخل شاشة الفيديو (الصوت فقط).
@@ -690,6 +695,9 @@ class FirebaseMotionAiRepository : MotionAiRepository {
                 val transition = SceneTransitionType.fromId(
                     obj.optString("transitionToNext").ifBlank { SceneTransitionType.CROSS_FADE.id }
                 )
+                val vfx = SceneVisualEffect.fromId(
+                    obj.optString("visualEffect").ifBlank { SceneVisualEffect.AUTO.id }
+                )
 
                 val deterministicMatch = ContentSfxMatcher.matchForTextAndSymbol(
                     text = "$badge $headline $subheadline $voiceScript",
@@ -721,7 +729,8 @@ class FirebaseMotionAiRepository : MotionAiRepository {
                         voiceoverScript = voiceScript,
                         voiceoverEnabled = oldScene?.voiceoverEnabled ?: true,
                         transitionToNext = transition.id,
-                        transitionDurationSeconds = oldScene?.transitionDurationSeconds ?: 0.55f
+                        transitionDurationSeconds = oldScene?.transitionDurationSeconds ?: 0.55f,
+                        visualEffect = vfx.id
                     )
                 )
             }

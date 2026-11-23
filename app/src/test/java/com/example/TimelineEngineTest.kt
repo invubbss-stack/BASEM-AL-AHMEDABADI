@@ -192,5 +192,79 @@ class TimelineEngineTest {
             com.example.model.BackgroundMusicTrack.defaultForMood(com.example.model.AudioMoodCategory.CALM).category
         )
     }
+
+    @Test
+    fun sceneVfxMatcher_activatesEffectsBySceneTypeAndPreservesManualOverride() {
+        val gamingScene = MotionScene(
+            order = 1,
+            badge = "بطولة",
+            headline = "انطلاق بطولة الألعاب",
+            subheadline = "مواجهات حماسية مباشرة",
+            sceneSymbol = com.example.model.SceneSymbol.GAMEPAD.id
+        )
+        assertEquals(
+            com.example.model.SceneVisualEffect.CYBER_GLOW_PARTICLES,
+            com.example.model.SceneVfxMatcher.resolveEffectiveEffect(
+                gamingScene,
+                com.example.model.MotionTopicGenre.GAMING
+            )
+        )
+
+        val spaceScene = MotionScene(
+            order = 2,
+            badge = "الفضاء",
+            headline = "رحلة بين النجوم والمجرات",
+            subheadline = "اكتشاف كوكب جديد",
+            sceneSymbol = com.example.model.SceneSymbol.PLANET.id
+        )
+        assertEquals(
+            com.example.model.SceneVisualEffect.FLOATING_PARTICLES,
+            com.example.model.SceneVfxMatcher.resolveEffectiveEffect(
+                spaceScene,
+                com.example.model.MotionTopicGenre.SPACE_SCIENCE
+            )
+        )
+
+        val docScene = MotionScene(
+            order = 3,
+            badge = "وثائقي",
+            headline = "حكاية من قلب التاريخ",
+            subheadline = "تحقيق بصري عميق",
+            sceneSymbol = com.example.model.SceneSymbol.FILM.id
+        )
+        assertEquals(
+            com.example.model.SceneVisualEffect.CINEMATIC_BLUR,
+            com.example.model.SceneVfxMatcher.resolveEffectiveEffect(
+                docScene,
+                com.example.model.MotionTopicGenre.DOCUMENTARY
+            )
+        )
+
+        val techScene = MotionScene(
+            order = 4,
+            badge = "إطلاق",
+            headline = "منصة ذكية سريعة",
+            subheadline = "أداء تقني متفوق",
+            sceneSymbol = com.example.model.SceneSymbol.CODE.id
+        )
+        assertEquals(
+            com.example.model.SceneVisualEffect.NEON_GLOW,
+            com.example.model.SceneVfxMatcher.resolveEffectiveEffect(
+                techScene,
+                com.example.model.MotionTopicGenre.TECH_LAUNCH
+            )
+        )
+
+        val manualOverride = gamingScene.copy(
+            visualEffect = com.example.model.SceneVisualEffect.NONE.id
+        )
+        assertEquals(
+            com.example.model.SceneVisualEffect.NONE,
+            com.example.model.SceneVfxMatcher.resolveEffectiveEffect(
+                manualOverride,
+                com.example.model.MotionTopicGenre.GAMING
+            )
+        )
+    }
 }
 

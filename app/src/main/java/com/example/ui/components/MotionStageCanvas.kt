@@ -38,10 +38,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,8 +54,11 @@ import com.example.model.AspectRatioOption
 import com.example.model.MotionAnimationType
 import com.example.model.MotionFontStyle
 import com.example.model.MotionScene
+import com.example.model.MotionTopicGenre
 import com.example.model.SceneSymbol
 import com.example.model.SceneTransitionType
+import com.example.model.SceneVfxMatcher
+import com.example.model.SceneVisualEffect
 import com.example.model.SmartColorPalette
 import com.example.model.TimelineFrameState
 import com.example.model.VisualMotif
@@ -99,6 +104,7 @@ fun MotionStageCanvas(
     aspectRatio: AspectRatioOption,
     palette: SmartColorPalette,
     fontStyle: MotionFontStyle = MotionFontStyle.THMANYAH,
+    topicGenre: MotionTopicGenre = MotionTopicGenre.AUTO,
     isPlaying: Boolean,
     isSpeakingThisScene: Boolean,
     spokenFraction: Float,
@@ -201,6 +207,7 @@ fun MotionStageCanvas(
                 sceneProgress = sceneProgress,
                 isPortrait = isPortrait,
                 palette = palette,
+                topicGenre = topicGenre,
                 headlineFont = activeHeadlineFont,
                 bodyFont = activeBodyFont,
                 isSpeakingThisScene = isSpeakingThisScene,
@@ -271,6 +278,7 @@ fun MotionStageCanvas(
                     sceneProgress = frameState.incomingProgress,
                     isPortrait = isPortrait,
                     palette = palette,
+                    topicGenre = topicGenre,
                     headlineFont = activeHeadlineFont,
                     bodyFont = activeBodyFont,
                     isSpeakingThisScene = false,
@@ -417,12 +425,20 @@ private fun SceneVisualLayer(
     sceneProgress: Float,
     isPortrait: Boolean,
     palette: SmartColorPalette,
+    topicGenre: MotionTopicGenre,
     headlineFont: FontFamily,
     bodyFont: FontFamily,
     isSpeakingThisScene: Boolean,
     spokenFraction: Float,
     modifier: Modifier = Modifier
 ) {
+    val effectiveVfx = SceneVfxMatcher.resolveEffectiveEffect(scene, topicGenre)
+    val hasNeonGlow = effectiveVfx == SceneVisualEffect.NEON_GLOW ||
+        effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES
+    val hasParticles = effectiveVfx == SceneVisualEffect.FLOATING_PARTICLES ||
+        effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES
+    val hasCinematicBlur = effectiveVfx == SceneVisualEffect.CINEMATIC_BLUR
+
     Box(
         modifier = modifier.background(
             Brush.linearGradient(
@@ -434,27 +450,53 @@ private fun SceneVisualLayer(
             )
         )
     ) {
-        // Procedural animated background & motif canvas
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        // Procedural animated background, motif & scene-aware VFX canvas
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (hasCinematicBlur) Modifier.blur(5.dp) else Modifier)
+        ) {
             val w = size.width
             val h = size.height
             val minDim = min(w, h)
+            val pulse = 0.5f + 0.5f * sin(sceneProgress * PI.toFloat() * 4f)
 
             val glowCx = w * (0.3f + 0.4f * sin(sceneProgress * PI.toFloat()))
             val glowCy = h * 0.36f
+            val baseGlowAlpha = if (hasNeonGlow) 0.44f + 0.14f * pulse else 0.28f
+            val glowRadius = if (hasNeonGlow) minDim * 0.88f else minDim * 0.72f
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        palette.primaryColor.copy(alpha = 0.28f),
-                        palette.secondaryColor.copy(alpha = 0.12f),
+                        palette.primaryColor.copy(alpha = baseGlowAlpha),
+                        palette.secondaryColor.copy(alpha = if (hasNeonGlow) 0.24f else 0.12f),
                         Color.Transparent
                     ),
                     center = Offset(glowCx, glowCy),
-                    radius = minDim * 0.72f
+                    radius = glowRadius
                 ),
-                radius = minDim * 0.72f,
+                radius = glowRadius,
                 center = Offset(glowCx, glowCy)
             )
+
+            if (hasNeonGlow) {
+                // Secondary opposite neon rim bloom for gaming / tech depth
+                val secCx = w * (0.72f - 0.36f * sin(sceneProgress * PI.toFloat()))
+                val secCy = h * 0.68f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            palette.secondaryColor.copy(alpha = 0.32f + 0.10f * (1f - pulse)),
+                            palette.primaryColor.copy(alpha = 0.08f),
+                            Color.Transparent
+                        ),
+                        center = Offset(secCx, secCy),
+                        radius = minDim * 0.66f
+                    ),
+                    radius = minDim * 0.66f,
+                    center = Offset(secCx, secCy)
+                )
+            }
 
             when (scene.motifEnum) {
                 VisualMotif.ORBIT_RINGS -> {
@@ -570,6 +612,140 @@ private fun SceneVisualLayer(
                     }
                 }
             }
+
+            // VFX Layer 1: Cinematic Blur Bokeh Orbs & Vignette
+            if (hasCinematicBlur) {
+                for (i in 0..6) {
+                    val seed = i * 1.91f + sceneIndex * 0.7f
+                    val bx = w * (0.14f + 0.72f * (0.5f + 0.5f * sin(seed + sceneProgress * 1.4f)))
+                    val by = h * (0.12f + 0.76f * (0.5f + 0.5f * cos(seed * 1.3f - sceneProgress * 1.1f)))
+                    val bRadius = minDim * (0.14f + (i % 3) * 0.06f)
+                    val orbColor = if (i % 2 == 0) palette.primaryColor else palette.secondaryColor
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                orbColor.copy(alpha = 0.26f),
+                                orbColor.copy(alpha = 0.08f),
+                                Color.Transparent
+                            ),
+                            center = Offset(bx, by),
+                            radius = bRadius
+                        ),
+                        radius = bRadius,
+                        center = Offset(bx, by)
+                    )
+                }
+                // Soft outer cinema lens vignette
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.42f)
+                        ),
+                        center = Offset(w * 0.5f, h * 0.5f),
+                        radius = minDim * 0.92f
+                    )
+                )
+            }
+        }
+
+        // Sharp Foreground VFX Overlay (Particles, Cyber Sparks & Neon Edge Aura)
+        if (hasParticles || hasNeonGlow) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val minDim = min(w, h)
+                val pulse = 0.5f + 0.5f * sin(sceneProgress * PI.toFloat() * 4f)
+
+                if (hasNeonGlow) {
+                    // Luminous inner frame aura around the stage
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                palette.primaryColor.copy(alpha = 0.14f + 0.08f * pulse),
+                                Color.Transparent,
+                                palette.secondaryColor.copy(alpha = 0.14f + 0.08f * (1f - pulse))
+                            )
+                        )
+                    )
+                }
+
+                if (effectiveVfx == SceneVisualEffect.CYBER_GLOW_PARTICLES) {
+                    // Subtle cyber scanlines + fast diagonal electric sparks
+                    val scanStep = 7.dp.toPx()
+                    var sy = 0f
+                    while (sy < h) {
+                        drawLine(
+                            color = palette.primaryColor.copy(alpha = 0.035f),
+                            start = Offset(0f, sy),
+                            end = Offset(w, sy),
+                            strokeWidth = 1f
+                        )
+                        sy += scanStep
+                    }
+                    for (i in 0 until 20) {
+                        val seed = i * 2.13f + sceneIndex * 1.1f
+                        val px = ((0.5f + 0.5f * sin(seed * 3.7f)) * w + sceneProgress * 120f * cos(seed))
+                            .let { ((it % w) + w) % w }
+                        val py = ((0.5f + 0.5f * cos(seed * 2.9f)) * h - sceneProgress * 185f)
+                            .let { ((it % h) + h) % h }
+                        val sparkColor = if (i % 2 == 0) palette.primaryColor else palette.secondaryColor
+                        val sparkLen = minDim * (0.025f + (i % 3) * 0.014f)
+                        val twinkle = 0.45f + 0.55f * abs(sin(sceneProgress * PI.toFloat() * 5f + seed))
+
+                        drawLine(
+                            color = sparkColor.copy(alpha = 0.65f * twinkle),
+                            start = Offset(px, py),
+                            end = Offset(px - sparkLen * 0.45f, py + sparkLen),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.9f * twinkle),
+                                    sparkColor.copy(alpha = 0.5f * twinkle),
+                                    Color.Transparent
+                                ),
+                                center = Offset(px, py),
+                                radius = 7.dp.toPx()
+                            ),
+                            radius = 7.dp.toPx(),
+                            center = Offset(px, py)
+                        )
+                    }
+                } else if (effectiveVfx == SceneVisualEffect.FLOATING_PARTICLES) {
+                    // Multi-depth cosmic / luminous floating particles & twinkling stars
+                    for (i in 0 until 26) {
+                        val seed = i * 1.67f + sceneIndex * 0.85f
+                        val speedY = if (i % 3 == 0) 95f else 54f
+                        val px = ((0.5f + 0.5f * sin(seed * 4.1f)) * w + sin(sceneProgress * PI.toFloat() * 2f + seed) * 24f)
+                            .let { ((it % w) + w) % w }
+                        val py = ((0.5f + 0.5f * cos(seed * 2.7f)) * h - sceneProgress * speedY)
+                            .let { ((it % h) + h) % h }
+                        val pColor = if (i % 2 == 0) palette.primaryColor else palette.secondaryColor
+                        val twinkle = 0.35f + 0.65f * abs(sin(sceneProgress * PI.toFloat() * 3f + seed))
+                        val coreR = (1.6f + (i % 4) * 1.1f).dp.toPx()
+
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    pColor.copy(alpha = 0.55f * twinkle),
+                                    Color.Transparent
+                                ),
+                                center = Offset(px, py),
+                                radius = coreR * 3.4f
+                            ),
+                            radius = coreR * 3.4f,
+                            center = Offset(px, py)
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.85f * twinkle),
+                            radius = coreR * 0.6f,
+                            center = Offset(px, py)
+                        )
+                    }
+                }
+            }
         }
 
         val animType = scene.animationEnum
@@ -612,10 +788,10 @@ private fun SceneVisualLayer(
             scene.headline
         }
 
-        val blurRadiusDp = if (animType == MotionAnimationType.BLUR_FOCUS) {
-            ((1f - enterT) * 12f).dp
-        } else {
-            0.dp
+        val blurRadiusDp = when {
+            animType == MotionAnimationType.BLUR_FOCUS -> ((1f - enterT) * 12f).dp
+            hasCinematicBlur -> ((1f - enterT) * 7f).dp
+            else -> 0.dp
         }
 
         val glitchOffset = if (animType == MotionAnimationType.GLITCH_RGB && enterT < 0.9f) {
@@ -687,15 +863,27 @@ private fun SceneVisualLayer(
                 }
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = palette.primaryColor.copy(alpha = 0.18f),
+                    color = palette.primaryColor.copy(alpha = if (hasNeonGlow) 0.26f else 0.18f),
                     modifier = Modifier
                         .size(if (isPortrait) 48.dp else 44.dp)
+                        .then(
+                            if (hasNeonGlow) {
+                                Modifier.shadow(
+                                    elevation = 16.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    ambientColor = palette.primaryColor,
+                                    spotColor = palette.primaryColor
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
                         .graphicsLayer {
                             scaleX = pulseScale
                             scaleY = pulseScale
                         }
                         .border(
-                            width = 1.2.dp,
+                            width = if (hasNeonGlow) 1.8.dp else 1.2.dp,
                             brush = Brush.linearGradient(
                                 colors = listOf(palette.primaryColor, palette.secondaryColor)
                             ),
@@ -753,9 +941,23 @@ private fun SceneVisualLayer(
                         modifier = Modifier.graphicsLayer { translationX = -glitchOffset * 1.4f }
                     )
                 }
+                val headlineShadow = when {
+                    hasNeonGlow -> Shadow(
+                        color = palette.primaryColor.copy(alpha = 0.85f),
+                        offset = Offset.Zero,
+                        blurRadius = 24f
+                    )
+                    hasCinematicBlur -> Shadow(
+                        color = Color.Black.copy(alpha = 0.65f),
+                        offset = Offset(0f, 4f),
+                        blurRadius = 14f
+                    )
+                    else -> Shadow.None
+                }
                 Text(
                     text = headlineDisplayed,
                     color = palette.textColor,
+                    style = TextStyle(shadow = headlineShadow),
                     fontFamily = headlineFont,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = if (isPortrait) 25.sp else 27.sp,

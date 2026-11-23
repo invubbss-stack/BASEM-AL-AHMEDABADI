@@ -298,6 +298,132 @@ enum class VisualMotif(
     }
 }
 
+enum class SceneVisualEffect(
+    val id: String,
+    val labelAr: String,
+    val shortLabelAr: String,
+    val hintAr: String
+) {
+    AUTO(
+        id = "AUTO",
+        labelAr = "تلقائي حسب المشهد",
+        shortLabelAr = "تلقائي",
+        hintAr = "يفعّل التوهج أو الجزيئات أو الضبابية تلقائياً حسب نوع المشهد"
+    ),
+    NONE(
+        id = "NONE",
+        labelAr = "بدون تأثيرات إضافية",
+        shortLabelAr = "بدون",
+        hintAr = "مشهد تحريري نقي بدون طبقات توهج أو جزيئات"
+    ),
+    NEON_GLOW(
+        id = "NEON_GLOW",
+        labelAr = "توهج نيون ساطع",
+        shortLabelAr = "توهج Glow",
+        hintAr = "هالات نيون مضيئة وتوهج حول الرمز والعنوان — مثالي للألعاب والتقنية"
+    ),
+    FLOATING_PARTICLES(
+        id = "FLOATING_PARTICLES",
+        labelAr = "جزيئات متطايرة",
+        shortLabelAr = "جزيئات Particles",
+        hintAr = "شرارات وجزيئات ضوئية متعددة العمق — مثالي للفضاء والحماس"
+    ),
+    CINEMATIC_BLUR(
+        id = "CINEMATIC_BLUR",
+        labelAr = "ضبابية سينمائية",
+        shortLabelAr = "ضبابية Blur",
+        hintAr = "عمق ميدان وبوكيه ناعم وضبابية تركيز — مثالي للوثائقي والقصص"
+    ),
+    CYBER_GLOW_PARTICLES(
+        id = "CYBER_GLOW_PARTICLES",
+        labelAr = "توهج نيون + جزيئات",
+        shortLabelAr = "توهج+جزيئات",
+        hintAr = "توهج طاقة ساطع مع شرارات متطايرة لأقوى مشاهد الألعاب والإطلاق"
+    );
+
+    companion object {
+        fun fromId(id: String): SceneVisualEffect =
+            entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: AUTO
+    }
+}
+
+object SceneVfxMatcher {
+    fun resolveEffectiveEffect(
+        scene: MotionScene,
+        projectGenre: MotionTopicGenre = MotionTopicGenre.AUTO
+    ): SceneVisualEffect {
+        val explicit = scene.visualEffectEnum
+        if (explicit != SceneVisualEffect.AUTO) return explicit
+        return inferFromSceneAndGenre(scene, projectGenre)
+    }
+
+    fun inferFromSceneAndGenre(
+        scene: MotionScene,
+        projectGenre: MotionTopicGenre = MotionTopicGenre.AUTO
+    ): SceneVisualEffect {
+        val text = "${scene.badge} ${scene.headline} ${scene.subheadline} ${scene.voiceoverScript}".lowercase()
+        val sym = scene.symbolEnum
+        val anim = scene.animationEnum
+
+        // 1. Gaming / Esports / Glitch / Victory -> Cyber Glow + Sparks
+        if (projectGenre == MotionTopicGenre.GAMING ||
+            sym == SceneSymbol.GAMEPAD || sym == SceneSymbol.TROPHY ||
+            anim == MotionAnimationType.GLITCH_RGB ||
+            containsAny(text, "لعبة", "ألعاب", "جيمنج", "بطولة", "تحدي", "لاعب", "نيون", "طاقة", "أركيد")
+        ) {
+            return SceneVisualEffect.CYBER_GLOW_PARTICLES
+        }
+
+        // 2. Space / Science / Discovery / Celebration -> Floating Particles
+        if (projectGenre == MotionTopicGenre.SPACE_SCIENCE ||
+            sym == SceneSymbol.PLANET || sym == SceneSymbol.COMPASS || sym == SceneSymbol.CELEBRATE || sym == SceneSymbol.SPARKLES ||
+            containsAny(text, "فضاء", "كوكب", "مجرة", "نجوم", "كون", "احتفال", "مبروك", "تلسكوب", "ضوء")
+        ) {
+            return SceneVisualEffect.FLOATING_PARTICLES
+        }
+
+        // 3. Documentary / Storytelling / Cinema / Literature -> Cinematic Blur & Bokeh
+        if (projectGenre == MotionTopicGenre.DOCUMENTARY || projectGenre == MotionTopicGenre.STORYTELLING ||
+            sym == SceneSymbol.FILM || sym == SceneSymbol.BOOK || sym == SceneSymbol.CAMERA || sym == SceneSymbol.MICROPHONE ||
+            anim == MotionAnimationType.BLUR_FOCUS || anim == MotionAnimationType.CINEMA_BARS ||
+            containsAny(text, "وثائقي", "قصة", "حكاية", "تاريخ", "تحقيق", "حقيقة", "سينما", "عمق")
+        ) {
+            return SceneVisualEffect.CINEMATIC_BLUR
+        }
+
+        // 4. Tech / Launch / Security / Rocket -> Neon Glow
+        if (projectGenre == MotionTopicGenre.TECH_LAUNCH ||
+            sym == SceneSymbol.CODE || sym == SceneSymbol.BRAIN || sym == SceneSymbol.SHIELD || sym == SceneSymbol.FLASH || sym == SceneSymbol.ROCKET ||
+            containsAny(text, "ذكاء", "تطبيق", "تقنية", "برمجة", "انطلق", "سرعة", "صاروخ")
+        ) {
+            return SceneVisualEffect.NEON_GLOW
+        }
+
+        // 5. Fallback by motion dynamics & visual motif
+        return when (anim) {
+            MotionAnimationType.ZOOM_POP, MotionAnimationType.BOUNCE_DROP -> SceneVisualEffect.NEON_GLOW
+            MotionAnimationType.FLOAT_PULSE, MotionAnimationType.SPIN_ORBIT -> SceneVisualEffect.FLOATING_PARTICLES
+            else -> when (scene.motifEnum) {
+                VisualMotif.PARTICLE_GLOW -> SceneVisualEffect.FLOATING_PARTICLES
+                VisualMotif.WAVE_RIBBON -> SceneVisualEffect.CINEMATIC_BLUR
+                else -> SceneVisualEffect.NEON_GLOW
+            }
+        }
+    }
+
+    fun explainMatch(scene: MotionScene, projectGenre: MotionTopicGenre = MotionTopicGenre.AUTO): String {
+        val resolved = resolveEffectiveEffect(scene, projectGenre)
+        return if (scene.visualEffectEnum == SceneVisualEffect.AUTO) {
+            "تلقائي ← ${resolved.labelAr}"
+        } else {
+            "مختار يدوياً: ${resolved.labelAr}"
+        }
+    }
+
+    private fun containsAny(text: String, vararg keywords: String): Boolean =
+        keywords.any { text.contains(it) }
+}
+
 enum class SceneSymbol(
     val id: String,
     val labelAr: String
@@ -734,13 +860,15 @@ data class MotionScene(
     val voiceoverScript: String = "",
     val voiceoverEnabled: Boolean = true,
     val transitionToNext: String = SceneTransitionType.CROSS_FADE.id,
-    val transitionDurationSeconds: Float = 0.55f
+    val transitionDurationSeconds: Float = 0.55f,
+    val visualEffect: String = SceneVisualEffect.AUTO.id
 ) {
     val animationEnum: MotionAnimationType get() = MotionAnimationType.fromId(animationType)
     val motifEnum: VisualMotif get() = VisualMotif.fromId(visualMotif)
     val symbolEnum: SceneSymbol get() = SceneSymbol.fromId(sceneSymbol)
     val soundEffectEnum: SceneSoundEffect get() = SceneSoundEffect.fromId(soundEffect)
     val transitionEnum: SceneTransitionType get() = SceneTransitionType.fromId(transitionToNext)
+    val visualEffectEnum: SceneVisualEffect get() = SceneVisualEffect.fromId(visualEffect)
 
     val effectiveVoiceScript: String
         get() = voiceoverScript.trim().ifBlank {

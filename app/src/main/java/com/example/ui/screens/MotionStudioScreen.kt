@@ -639,6 +639,7 @@ private fun BuildSceneEditor(
         scenes = uiState.project.scenes,
         selectedIndex = uiState.selectedSceneIndex,
         totalDurationSeconds = uiState.effectiveTotalDurationSeconds,
+        topicGenre = uiState.project.topicGenreEnum,
         selectedSfxCategoryFilter = uiState.selectedSfxCategoryFilter,
         onSelectSfxCategory = viewModel::selectSfxCategoryFilter,
         onSelectScene = viewModel::selectSceneForEdit,
