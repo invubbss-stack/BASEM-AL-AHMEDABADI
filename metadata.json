@@ -1,0 +1,6 @@
+{
+  "name": "ستوديو الموشن",
+  "description": "تطبيق إنشاء فيديوهات موشن جرافيك بالذكاء الاصطناعي بواجهة عربية وتصميم داكن عصري",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,34 @@
+<resources>
+    <string name="app_name">ستوديو الموشن</string>
+    <string name="app_subtitle">مخرج الموشن جرافيك بالذكاء الاصطناعي</string>
+    <string name="tab_studio">الاستوديو</string>
+    <string name="tab_preview">المعاينة والتصدير</string>
+    <string name="tab_scenes">المشاهد</string>
+    <string name="prompt_section_title">فكرة الفيديو أو نص الإعلان</string>
+    <string name="prompt_placeholder">مثال: إطلاق تطبيق توصيل قهوة مختصة خلال 15 دقيقة بتصميم عصري وعرض خاص لأول طلب...</string>
+    <string name="improve_copy_button">تحسين النص الإعلاني</string>
+    <string name="improving_copy_loading">جاري صياغة النص...</string>
+    <string name="undo_copy_button">تراجع</string>
+    <string name="aspect_ratio_title">مقاس الفيديو</string>
+    <string name="aspect_9_16">9:16 طولي</string>
+    <string name="aspect_9_16_sub">ريلز • تيك توك • شورتس</string>
+    <string name="aspect_16_9">16:9 عرضي</string>
+    <string name="aspect_16_9_sub">يوتيوب • عروض تقديمية</string>
+    <string name="palette_section_title">منتقي الألوان الذكي</string>
+    <string name="generate_motion_button">توليد الموشن جرافيك</string>
+    <string name="generating_motion_loading">المخرج الذكي يصمم المشاهد...</string>
+    <string name="scenes_editor_title">محرر المشاهد السريع</string>
+    <string name="add_scene_button">إضافة مشهد</string>
+    <string name="export_json_button">حفظ JSON</string>
+    <string name="share_json_button">مشاركة JSON</string>
+    <string name="view_json_button">معاينة JSON</string>
+    <string name="import_json_button">استيراد JSON</string>
+    <string name="export_video_button">تصدير فيديو MP4</string>
+    <string name="play_cd">تشغيل</string>
+    <string name="pause_cd">إيقاف مؤقت</string>
+    <string name="replay_cd">إعادة من البداية</string>
+    <string name="next_scene_cd">المشهد التالي</string>
+    <string name="prev_scene_cd">المشهد السابق</string>
+    <string name="close_cd">إغلاق</string>
+    <string name="delete_scene_cd">حذف المشهد</string>
+</resources>
